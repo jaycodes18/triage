@@ -92,12 +92,15 @@ function validatePlan(parsed: unknown): GeminiPlanResponse {
 }
 
 export async function generatePlan(
-  args: GeneratePlanArgs
+  args: GeneratePlanArgs,
+  apiKeyOverride?: string
 ): Promise<GeminiPlanResponse> {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const apiKey =
+    apiKeyOverride ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "Missing API key. Add NEXT_PUBLIC_GEMINI_API_KEY to your .env.local file."
+      "No API key found. Please add your Gemini API key to continue."
     );
   }
 

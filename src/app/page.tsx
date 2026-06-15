@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePlanStore } from "@/store/usePlanStore";
@@ -9,6 +9,8 @@ import TimeInput from "@/components/TimeInput";
 import TopicsInput from "@/components/TopicsInput";
 import ConfidenceSweep from "@/components/ConfidenceSweep";
 import LoadingOrb from "@/components/LoadingOrb";
+import ApiKeySetup from "@/components/ApiKeySetup";
+import { hasApiKey } from "@/lib/apiKey";
 
 const stepVariants = {
   enter: (direction: number) => ({
@@ -30,14 +32,34 @@ export default function SetupPage() {
   const generatedPlanId = usePlanStore((s) => s.generatedPlanId);
   const back = usePlanStore((s) => s.back);
   const generate = usePlanStore((s) => s.generate);
+  const setUseDemo = usePlanStore((s) => s.setUseDemo);
 
   const router = useRouter();
+
+  // Show API key setup overlay until a key is stored or demo is chosen
+  const [keyReady, setKeyReady] = useState(false);
+  useEffect(() => {
+    setKeyReady(hasApiKey());
+  }, []);
+
+  function handleKeySet() {
+    setKeyReady(true);
+  }
+
+  function handleDemo() {
+    setUseDemo(true);
+    setKeyReady(true);
+  }
 
   useEffect(() => {
     if (status === "done" && generatedPlanId) {
       router.push(`/plan/${generatedPlanId}`);
     }
   }, [status, generatedPlanId, router]);
+
+  if (!keyReady) {
+    return <ApiKeySetup onKeySet={handleKeySet} onDemo={handleDemo} />;
+  }
 
   if (status === "loading") {
     return <LoadingOrb />;

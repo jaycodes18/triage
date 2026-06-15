@@ -8,6 +8,8 @@ import type {
 } from "@/types";
 import { generatePlan } from "@/lib/gemini";
 import { savePlan } from "@/lib/storage";
+import { getStoredApiKey } from "@/lib/apiKey";
+import { DEMO_SAVED_PLAN } from "@/lib/demoData";
 
 export type SetupStep = 1 | 2 | 3 | 4;
 
@@ -26,6 +28,7 @@ interface PlanState {
   status: "idle" | "loading" | "error" | "done";
   error: string | null;
   generatedPlanId: string | null;
+  useDemo: boolean;
 
   // Actions
   setStep: (step: SetupStep) => void;
@@ -36,6 +39,7 @@ interface PlanState {
   addTopic: (topic: string) => void;
   removeTopic: (topic: string) => void;
   setConfidence: (topic: string, value: number) => void;
+  setUseDemo: (val: boolean) => void;
   reset: () => void;
   generate: () => Promise<void>;
 }
@@ -68,6 +72,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   status: "idle",
   error: null,
   generatedPlanId: null,
+  useDemo: false,
 
   setStep: (step) => set({ step }),
 
@@ -109,6 +114,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   setConfidence: (topic, value) =>
     set((s) => ({ confidences: { ...s.confidences, [topic]: value } })),
 
+  setUseDemo: (val) => set({ useDemo: val }),
+
   reset: () =>
     set({
       step: 1,
@@ -122,6 +129,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       status: "idle",
       error: null,
       generatedPlanId: null,
+      useDemo: false,
     }),
 
   generate: async () => {
@@ -141,13 +149,31 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
     const started = Date.now();
 
+    // Demo mode — skip the API call and use hardcoded data
+    if (state.useDemo) {
+      await new Promise<void>((resolve) => setTimeout(resolve, MIN_LOADING_MS));
+      const demoId = uuidv4();
+      const demoPlan: SavedPlan = {
+        ...DEMO_SAVED_PLAN,
+        id: demoId,
+        createdAt: new Date().toISOString(),
+      };
+      savePlan(demoPlan);
+      set({ status: "done", generatedPlanId: demoId });
+      return;
+    }
+
     try {
+      const storedKey = getStoredApiKey() ?? undefined;
       const [plan] = await Promise.all([
-        generatePlan({
-          subject: state.subject,
-          timeframeLabel: label,
-          topics: topicConfidences,
-        }),
+        generatePlan(
+          {
+            subject: state.subject,
+            timeframeLabel: label,
+            topics: topicConfidences,
+          },
+          storedKey
+        ),
         // Enforce the minimum loading duration for a satisfying orb animation.
         new Promise<void>((resolve) =>
           setTimeout(resolve, MIN_LOADING_MS)
